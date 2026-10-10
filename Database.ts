@@ -1,59 +1,61 @@
-import { getRandomInt, sleep } from "./Util";
+import { getRandomInt, sleep } from "./Util.ts";
 
-export enum Operations {
-    ADD,
-    SUBTRACT,
-    SET
-}
+export const Operations = {
+  ADD: "ADD",
+  SUBTRACT: "SUBTRACT",
+  SET: "SET",
+} as const;
+
+export type Operations = (typeof Operations)[keyof typeof Operations];
 
 export class Database {
+  private data: { [key: string]: number };
 
-    private data: { [key: string]: number }
+  constructor() {
+    this.data = {};
+  }
 
-    constructor() {
-        this.data = {};
+  set = async (message: Message): Promise<void> => {
+    const current = this.data[message.key] || 0;
+    let result: number;
+
+    switch (message.operation) {
+      case Operations.ADD:
+        result = current + message.val;
+        break;
+      case Operations.SUBTRACT:
+        result = current - message.val;
+        break;
+      case Operations.SET:
+        result = message.val;
+        break;
+      default:
+        throw Error(`Invalid operation ${message.operation}`);
     }
+    const randomDelay = getRandomInt(100);
+    await sleep(randomDelay);
+    this.data[message.key] = result;
+  };
 
-    set = async (message: Message): Promise<void> => {
-        const current = this.data[message.key] || 0
-        let result: number
-        switch (message.operation) {
-            case Operations.ADD:
-                result = current + message.val
-                break;
-            case Operations.SUBTRACT:
-                result = current - message.val
-                break;
-            case Operations.SET:
-                result = message.val
-                break;
-            default:
-                throw Error(`Invalid operation ${message.operation}`)
-        }
-        const randomDelay = getRandomInt(100)
-        await sleep(randomDelay)
-        this.data[message.key] = result
-    }
+  get = (key: string): number => {
+    return this.data[key];
+  };
 
-    get = (key: string): number => {
-        return this.data[key]
-    }
-
-    state = () => {
-        return this.data
-    }
+  state = () => {
+    return this.data;
+  };
 }
 
 export class Message {
-    public key: string
-    public operation: Operations
-    public val: number
-    public id: string
+  public key: string;
+  public operation: Operations;
+  public val: number;
+  public id: string;
 
-    constructor(key: string, operation: Operations, val: number) {
-        this.key = key
-        this.operation = operation
-        this.val = val
-        this.id = `${key}:${val}:${operation}:${Date.now()}:${Math.random()}`
-    }
+  constructor(key: string, operation: Operations, val: number) {
+    this.key = key;
+    this.operation = operation;
+    this.val = val;
+    this.id = `${key}:${val}:${operation}:${Date.now()}:${Math.random()}`;
+  }
 }
