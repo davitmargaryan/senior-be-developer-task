@@ -1,3 +1,5 @@
+# NO AI
+
 Task completed using ZERO AI. Only this text was copy-edited by AI.
 Changed only `Queue.ts` (other files were only formatted).
 
