@@ -1,6 +1,6 @@
 import { Database, Operations, Message } from "./Database.ts";
 import { Queue } from "./Queue.ts";
-import { range, sleep, getRandomIntInRange } from "./Util.ts";
+import { range, getRandomIntInRange } from "./Util.ts";
 import { Worker } from "./Worker.ts";
 
 const ITEMS_NUMBER = getRandomIntInRange(3, 6);
