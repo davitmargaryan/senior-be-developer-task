@@ -15,17 +15,23 @@ Expected result is `95` per item with an empty queue. A global lock would get th
 
 ## Implementation (`Queue.ts`)
 
-Messages stay in `messages` until `Confirm`. `lockedMessageKeys` is the set of keys currently being processed.
+Messages stay in `messages` until `Confirm`. `lockedMessagesMap` maps each key currently being processed to its lock entry: `{ messageId, workerId }`.
 
 **Enqueue** — `push` onto `messages` (FIFO).
 
-**Dequeue** — `getFirstUnlockMessageIndex()` returns the first message whose key is not in `lockedMessageKeys` (or index `0` if nothing is locked). That message stays in the array; its key is `push`ed onto `lockedMessageKeys` and the message is returned. If the list is empty, or every leftover key is locked, it returns `undefined`.
+**Dequeue** — `getFirstUnlockMessageIndex()` returns the first message whose key is not in `lockedMessagesMap`. That message stays in the array; a lock entry for its key (message id + worker id) is stored and the message is returned. If the list is empty, or every leftover key is locked, it returns `undefined`.
 
-**Confirm** — finds the message by `id`, `splice`s it out of `messages`, and removes its key from `lockedMessageKeys`. The next message for that key can then be dequeued.
+**Confirm** — finds the message by `id`. It returns `false` and changes nothing if:
+
+- the id is unknown (`findIndex` returns `-1`; the old `splice(-1, 1)` would have deleted the last message),
+- the message's key has no lock entry (it was never dequeued),
+- the lock entry belongs to a different message or a different worker.
+
+Otherwise it `splice`s the message out of `messages`, deletes the lock entry and returns `true`. The next message for that key can then be dequeued.
 
 **Size** — `messages.length` (includes in-flight messages, since they are not removed on dequeue).
 
-So one key is never handled by two workers at the same time. Different keys can be in flight together, so workers still run in parallel.
+So one key is never handled by two workers at the same time, and messages for the same key are processed in enqueue order. Different keys can be in flight together, so workers still run in parallel.
 
 Workers stop when `Dequeue` returns `undefined`. Extra workers may exit while some keys are locked; workers that hold a lock continue after `Confirm` and finish the rest. Parallelism is up to the number of distinct keys.
 
@@ -36,4 +42,3 @@ Workers stop when `Dequeue` returns `undefined`. Extra workers may exit while so
 - Serialize read–modify–write inside `Database.set` per key, so correctness does not depend only on the queue.
 - `getRandomIntInRange(3, 6)` never returns `6` (upper bound is exclusive).
 - The enqueue loop adds `0..9`; the README says `1..9`. Same total (`95`) because `+ 0` is a no-op.
-- Guard `Confirm` when `findIndex` is `-1`. `splice(-1, 1)` would delete the last message.

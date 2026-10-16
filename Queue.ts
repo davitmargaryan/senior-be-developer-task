@@ -1,23 +1,20 @@
 import { Message } from "./Database.ts";
 
+type LockedMessage = { messageId: string; workerId: number };
+
 export class Queue {
   private messages: Message[];
 
-  private lockedMessageKeys: string[];
-
-  start: number;
+  private lockedMessagesMap: Map<string, LockedMessage>;
 
   constructor() {
     this.messages = [];
-    this.lockedMessageKeys = [];
-    this.start = performance.now();
+    this.lockedMessagesMap = new Map();
   }
 
   getFirstUnlockMessageIndex(): number {
     return this.messages.findIndex(
-      (message) =>
-        !this.lockedMessageKeys.length ||
-        !this.lockedMessageKeys.includes(message.key),
+      (message) => !this.lockedMessagesMap.has(message.key),
     );
   }
 
@@ -26,27 +23,38 @@ export class Queue {
   };
 
   Dequeue = (workerId: number): Message | undefined => {
-    if (!this.messages.length) return undefined;
     const firstUnlockedMessageIndex = this.getFirstUnlockMessageIndex();
     if (firstUnlockedMessageIndex === -1) {
       return undefined;
     }
     const messageToLock = this.messages[firstUnlockedMessageIndex];
-    this.lockedMessageKeys.push(messageToLock.key);
+    this.lockedMessagesMap.set(messageToLock.key, {
+      messageId: messageToLock.id,
+      workerId,
+    });
     return messageToLock;
   };
 
   Confirm = (workerId: number, messageId: string) => {
-    const mesInd = this.messages.findIndex((a) => a.id === messageId);
-    const mess = this.messages.splice(mesInd, 1)[0];
-    this.lockedMessageKeys = this.lockedMessageKeys.filter(
-      (k) => k !== mess?.key,
-    );
-    if (!this.messages.length) {
-      const end = performance.now();
+    const index = this.messages.findIndex((m) => m.id === messageId);
 
-      console.log(`Execution time: ${end - this.start} ms`);
+    if (index === -1) return false;
+
+    const { key } = this.messages[index];
+    const lockedMessage = this.lockedMessagesMap.get(key);
+
+    if (
+      !lockedMessage ||
+      lockedMessage.messageId !== messageId ||
+      lockedMessage.workerId !== workerId
+    ) {
+      return false;
     }
+
+    this.messages.splice(index, 1);
+    this.lockedMessagesMap.delete(key);
+
+    return true;
   };
 
   Size = () => {
