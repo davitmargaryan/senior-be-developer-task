@@ -15,6 +15,13 @@ const applyToAll = (queue: Queue, operation: Operations, val: number): void => {
   }
 };
 
+const withTimeout = async (promise: Promise<unknown>, ms: number) => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise((resolve) => (timer = setTimeout(resolve, ms)));
+  await Promise.race([promise, timeout]);
+  clearTimeout(timer);
+};
+
 const main = async () => {
   console.log(`Number of items:${ITEMS_NUMBER}`);
   console.log(`Number of workers:${WORKERS_NUMBER}`);
@@ -27,11 +34,11 @@ const main = async () => {
     applyToAll(queue, Operations.ADD, i);
   }
 
-  range(WORKERS_NUMBER).forEach((i) => {
-    const worker = new Worker(i, queue);
-    worker.Work(db.set);
-  });
-  await sleep(10000);
+  const workers = range(WORKERS_NUMBER).map((i) =>
+    new Worker(i, queue).Work(db.set),
+  );
+  await withTimeout(Promise.all(workers), 10000);
+
   console.log("Queue size: ", queue.Size());
   console.log("DB state:\n", JSON.stringify(db.state(), null, 4));
 };

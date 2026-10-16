@@ -16,10 +16,21 @@ export class Worker {
     while (true) {
       const message = this.queue.Dequeue(this.workerId);
       if (!message) {
-        break;
+        if (!this.queue.Size()) break;
+
+        await this.queue.WaitForAvailable();
+        continue;
       }
-      await callback(message);
-      this.queue.Confirm(this.workerId, message.id);
+      try {
+        await callback(message);
+        this.queue.Confirm(this.workerId, message.id);
+      } catch (error) {
+        console.error(
+          `Worker with id - ${this.workerId} failed message with id - ${message.id}:`,
+          error,
+        );
+        this.queue.Fail(this.workerId, message.id);
+      }
     }
   };
 }
